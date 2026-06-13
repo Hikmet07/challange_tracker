@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Challenge Tracker – SQL Yönetim Paneli</title>
+<style>
+:root {
+  --bg:      #0d1117;
+  --bg2:     #161b22;
+  --bg3:     #1c2333;
+  --border:  #30363d;
+  --blue:    #58a6ff;
+  --green:   #3fb950;
+  --red:     #f85149;
+  --yellow:  #d29922;
+  --purple:  #bc8cff;
+  --text:    #c9d1d9;
+  --muted:   #8b949e;
+  --accent:  #1f6feb;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+/* TOP BAR */
+.topbar { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.topbar .logo { font-size: 1.1rem; font-weight: 700; color: var(--blue); letter-spacing: -0.5px; }
+.topbar .logo span { color: var(--green); }
+.conn-status { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg3); cursor: pointer; margin-left: auto; }
+.conn-status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); transition: background 0.3s; }
+.conn-status.connected .dot { background: var(--green); }
+.conn-status.connected { border-color: #1a3a1a; }
+
+/* NAV */
+.nav { background: var(--bg2); border-bottom: 1px solid var(--border); display: flex; gap: 0; padding: 0 8px; flex-shrink: 0; }
+.nav button { background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted); padding: 9px 14px; cursor: pointer; font-size: 0.8rem; font-weight: 500; transition: all 0.15s; display: flex; align-items: center; gap: 6px; }
+.nav button:hover { color: var(--text); }
+.nav button.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+/* MAIN LAYOUT */
+.main { display: flex; flex: 1; overflow: hidden; }
+
+/* SIDEBAR */
+.sidebar { width: 200px; background: var(--bg2); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
+.sidebar-section { padding: 10px 8px 4px; font-size: 0.68rem; color: var(--muted); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.sidebar-item { display: flex; align-items: center; gap: 8px; padding: 6px 12px; cursor: pointer; font-size: 0.8rem; color: var(--muted); transition: all 0.15s; border-left: 2px solid transparent; }
+.sidebar-item:hover { background: var(--bg3); color: var(--text); }
+.sidebar-item.active { background: #1f2e45; color: var(--blue); border-left-color: var(--blue); }
+.sidebar-item .icon { font-size: 0.85rem; width: 16px; text-align: center; }
+.row-count { margin-left: auto; background: var(--bg); font-size: 0.68rem; padding: 1px 6px; border-radius: 999px; color: var(--muted); border: 1px solid var(--border); }
+
+/* CONTENT */
+.content { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+.section { display: none; flex-direction: column; height: 100%; overflow: hidden; }
+.section.active { display: flex; }
+
+/* QUERY EDITOR */
+.editor-area { padding: 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.editor-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.editor-toolbar span { font-size: 0.78rem; color: var(--muted); }
+.editor-toolbar select { background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 4px 8px; border-radius: 6px; font-size: 0.78rem; }
+.btn { padding: 5px 14px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.8rem; font-weight: 600; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; }
+.btn-blue { background: var(--accent); color: white; }
+.btn-blue:hover { background: #388bfd; }
+.btn-green { background: #238636; color: white; }
+.btn-green:hover { background: #2ea043; }
+.btn-red { background: #b91c1c; color: white; }
+.btn-red:hover { background: #dc2626; }
+.btn-ghost { background: var(--bg3); border: 1px solid var(--border); color: var(--text); }
+.btn-ghost:hover { background: var(--border); }
+.btn-sm { padding: 3px 10px; font-size: 0.75rem; }
+
+textarea.sql-editor {
+  width: 100%; height: 120px; background: #010409; border: 1px solid var(--border);
+  color: #c9d1d9; font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  font-size: 0.82rem; padding: 10px 12px; border-radius: 6px; resize: vertical;
+  outline: none; line-height: 1.6;
+}
+textarea.sql-editor:focus { border-color: var(--accent); }
+
+/* RESULT TABLE */
+.result-area { flex: 1; overflow: auto; padding: 12px; }
+.result-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 0.78rem; }
+.result-meta .tag { padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+.tag-ok { background: #1a3a1a; color: var(--green); }
+.tag-err { background: #3a1a1a; color: var(--red); }
+.tag-info { background: #1a2a3a; color: var(--blue); }
+
+table.result { width: 100%; border-collapse: collapse; font-size: 0.78rem; min-width: 600px; }
+table.result th { background: var(--bg3); color: var(--blue); padding: 7px 12px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; font-weight: 600; position: sticky; top: 0; z-index: 2; }
+table.result td { padding: 6px 12px; border-bottom: 1px solid #1c2333; color: var(--text); white-space: nowrap; }
+table.result tr:hover td { background: #161b22; }
+table.result td.null { color: var(--muted); font-style: italic; }
+table.result td.num { color: #79c0ff; }
+table.result td.date { color: #d2a8ff; }
+table.result td.status-completed { color: var(--green); font-weight: 600; }
+table.result td.status-missed { color: var(--red); font-weight: 600; }
+table.result td.status-active { color: var(--blue); font-weight: 600; }
+table.result td.status-failed { color: var(--red); }
+table.result td.pk-cell { color: var(--yellow); font-weight: 700; }
+table.result td.action-cell { display: flex; gap: 4px; }
+
+/* CONFIG FORM */
+.config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 16px; }
+.field-group { display: flex; flex-direction: column; gap: 4px; }
+.field-group label { font-size: 0.75rem; color: var(--muted); font-weight: 600; }
+.field-group input, .field-group select { background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 7px 10px; border-radius: 6px; font-size: 0.82rem; outline: none; }
+.field-group input:focus, .field-group select:focus { border-color: var(--accent); }
+.field-group input[type=password] { font-family: monospace; letter-spacing: 2px; }
+.full-width { grid-column: 1 / -1; }
+.conn-test-result { grid-column: 1 / -1; padding: 10px 14px; border-radius: 6px; font-size: 0.82rem; display: none; }
+.conn-test-result.show { display: block; }
+.conn-test-result.ok { background: #0d2818; border: 1px solid #238636; color: var(--green); }
+.conn-test-result.err { background: #2d0f0f; border: 1px solid #b91c1c; color: var(--red); }
+
+/* CRUD EDITOR MODAL */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; align-items: center; justify-content: center; }
+.modal-overlay.show { display: flex; }
+.modal { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 20px; width: 480px; max-width: 95vw; max-height: 90vh; overflow-y: auto; }
+.modal h3 { font-size: 1rem; color: var(--blue); margin-bottom: 14px; }
+.modal .field-group { margin-bottom: 10px; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+/* SCHEMA VIEW */
+.schema-card { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
+.schema-card-header { padding: 10px 14px; background: var(--bg2); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+.schema-card-header .tname { font-weight: 700; color: var(--blue); font-size: 0.88rem; }
+.schema-card-header .tcnt { font-size: 0.72rem; color: var(--muted); margin-left: auto; }
+
+/* SCROLL CUSTOM */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* snippet chips */
+.chip { display: inline-block; background: var(--bg3); border: 1px solid var(--border); color: var(--blue); padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-family: monospace; cursor: pointer; transition: background 0.15s; }
+.chip:hover { background: #1f2e45; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="logo">🔥 Challenge<span>Tracker</span> <span style="color:var(--muted);font-weight:400;font-size:0.82rem">/ SQL Yönetim Paneli</span></div>
+  <div class="conn-status" id="connStatus" onclick="show('config',this)">
+    <div class="dot"></div>
+    <span id="connLabel">Bağlantı yok</span>
+  </div>
+</div>
+
+<!-- NAV -->
+<div class="nav">
+  <button class="active" onclick="show('query',this)" id="navQuery">🖥️ Sorgu Editörü</button>
+  <button onclick="show('tables',this)" id="navTables">📋 Tablo Yöneticisi</button>
+  <button onclick="show('crud',this)" id="navCrud">✏️ Veri Düzenle</button>
+  <button onclick="show('schema',this)" id="navSchema">🗂️ Şema</button>
+  <button onclick="show('config',this)" id="navConfig">⚙️ Bağlantı</button>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-section">Tablolar</div>
+    <div class="sidebar-item active" data-table="users" onclick="selectTable('users',this)">
+      <span class="icon">🧑</span> users <span class="row-count" id="cnt-users">3</span>
+    </div>
+    <div class="sidebar-item" data-table="challenges" onclick="selectTable('challenges',this)">
+      <span class="icon">🎯</span> challenges <span class="row-count" id="cnt-challenges">6</span>
+    </div>
+    <div class="sidebar-item" data-table="daily_logs" onclick="selectTable('daily_logs',this)">
+      <span class="icon">📅</span> daily_logs <span class="row-count" id="cnt-logs">35</span>
+    </div>
+    <div class="sidebar-item" data-table="badges" onclick="selectTable('badges',this)">
+      <span class="icon">🏅</span> badges <span class="row-count" id="cnt-badges">4</span>
+    </div>
+    <div class="sidebar-item" data-table="user_badges" onclick="selectTable('user_badges',this)">
+      <span class="icon">🔗</span> user_badges <span class="row-count" id="cnt-ubadges">8</span>
+    </div>
+    <div class="sidebar-section" style="margin-top:8px">Hızlı Sorgular</div>
+    <div class="sidebar-item" onclick="loadSnippet('stats')"><span class="icon">📊</span> Kullanıcı Stat.</div>
+    <div class="sidebar-item" onclick="loadSnippet('streak')"><span class="icon">🔥</span> Streak Raporu</div>
+    <div class="sidebar-item" onclick="loadSnippet('badges_report')"><span class="icon">🏆</span> Rozet Raporu</div>
+    <div class="sidebar-item" onclick="loadSnippet('active')"><span class="icon">▶️</span> Aktif Görevler</div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- ====== SORGU EDİTÖRÜ ====== -->
+    <div id="section-query" class="section active">
+      <div class="editor-area">
+        <div class="editor-toolbar">
+          <span>SQL Sorgusu</span>
+          <select id="snippetSelect" onchange="loadFromSelect()" style="margin-left:4px">
+            <option value="">— Hazır Sorgu Seç —</option>
+            <option value="select_all">SELECT * FROM users</option>
+            <option value="join_ch">Challenge + Kullanıcı JOIN</option>
+            <option value="stats">Kullanıcı İstatistikleri</option>
+            <option value="streak">Streak Hesabı</option>
+            <option value="badges_report">Rozet Raporu</option>
+            <option value="active">Aktif Challenge'lar</option>
+            <option value="insert_user">INSERT – Yeni Kullanıcı</option>
+            <option value="update_status">UPDATE – Challenge Durumu</option>
+            <option value="delete_log">DELETE – Log Sil</option>
+            <option value="create_table">CREATE TABLE (challenges)</option>
+            <option value="alter_table">ALTER TABLE – Sütun Ekle</option>
+            <option value="drop_table">DROP TABLE (dikkatli!)</option>
+          </select>
+          <button class="btn btn-blue" onclick="runQuery()">▶ Çalıştır</button>
+          <button class="btn btn-ghost" onclick="clearEditor()">🗑 Temizle</button>
+          <button class="btn btn-ghost" onclick="formatSQL()">✦ Formatla</button>
+          <span id="execTime" style="margin-left:auto;color:var(--muted);font-size:0.75rem"></span>
+        </div>
+        <textarea class="sql-editor" id="sqlEditor" placeholder="SQL sorgunuzu buraya yazın... (Ctrl+Enter ile çalıştırın)"
+          onkeydown="editorKeydown(event)">SELECT * FROM users ORDER BY created_at DESC;</textarea>
+        <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+          <span class="chip" onclick="insertSnip('SELECT * FROM ')">SELECT *</span>
+          <span class="chip" onclick="insertSnip('WHERE ')">WHERE</span>
+          <span class="chip" onclick="insertSnip('ORDER BY id DESC')">ORDER BY</span>
+          <span class="chip" onclick="insertSnip('LIMIT 10')">LIMIT 10</span>
+          <span class="chip" onclick="insertSnip('JOIN ')">JOIN</span>
+          <span class="chip" onclick="insertSnip('GROUP BY ')">GROUP BY</span>
+          <span class="chip" onclick="insertSnip('COUNT(*)')">COUNT(*)</span>
+          <span class="chip" onclick="insertSnip('INNER JOIN challenges c ON u.id = c.user_id')">INNER JOIN</span>
+        </div>
+      </div>
+      <div class="result-area" id="queryResult">
+        <div style="color:var(--muted);font-size:0.82rem;padding:20px;text-align:center">
+          Bir SQL sorgusu yazın ve ▶ Çalıştır butonuna basın.<br>
+          <span style="font-size:0.75rem">Kısayol: <kbd style="background:var(--bg3);border:1px solid var(--border);padding:1px 6px;border-radius:3px">Ctrl+Enter</kbd></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== TABLO YÖNETİCİSİ ====== -->
+    <div id="section-tables" class="section">
+      <div class="editor-area" style="display:flex;align-items:center;gap:10px;padding:10px 12px">
+        <span style="font-weight:600;color:var(--blue)" id="tableTitle">📋 users</span>
+        <span style="color:var(--muted);font-size:0.78rem" id="tableSubtitle"></span>
+        <div style="margin-left:auto;display:flex;gap:6px">
+          <button class="btn btn-green btn-sm" onclick="openAddModal()">➕ Yeni Satır</button>
+          <button class="btn btn-ghost btn-sm" onclick="refreshTable()">↻ Yenile</button>
+          <input type="text" id="tableSearch" placeholder="Satırlarda ara..." onkeyup="filterTable()" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:4px 10px;border-radius:6px;font-size:0.78rem;outline:none;width:160px">
+        </div>
+      </div>
+      <div class="result-area" id="tableResult"></div>
+    </div>
+
+    <!-- ====== VERİ DÜZENLE ====== -->
+    <div id="section-crud" class="section" style="padding:16px;overflow-y:auto">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+
+        <!-- INSERT -->
+        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px">
+          <h3 style="color:var(--green);font-size:0.88rem;margin-bottom:12px">➕ Yeni Kayıt Ekle (INSERT)</h3>
+          <div class="field-group" style="margin-bottom:8px">
+            <label>Tablo</label>
+            <select id="insertTable" onchange="renderInsertForm()">
+              <option value="users">users</option>
+              <option value="challenges">challenges</option>
+              <option value="daily_logs">daily_logs</option>
+              <option value="badges">badges</option>
+              <option value="user_badges">user_badges</option>
+            </select>
+          </div>
+          <div id="insertForm"></div>
+          <button class="btn btn-green" style="margin-top:10px;width:100%" onclick="doInsert()">➕ Ekle</button>
+          <div id="insertResult" style="margin-top:8px;font-size:0.78rem"></div>
+        </div>
+
+        <!-- UPDATE -->
+        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px">
+          <h3 style="color:var(--yellow);font-size:0.88rem;margin-bottom:12px">✏️ Kayıt Güncelle (UPDATE)</h3>
+          <div class="field-group" style="margin-bottom:8px">
+            <label>Tablo</label>
+            <select id="updateTable" onchange="renderUpdateForm()">
+              <option value="challenges">challenges</option>
+              <option value="users">users</option>
+              <option value="daily_logs">daily_logs</option>
+            </select>
+          </div>
+          <div id="updateForm"></div>
+          <button class="btn btn-ghost" style="margin-top:10px;width:100%;border-color:var(--yellow);color:var(--yellow)" onclick="doUpdate()">✏️ Güncelle</button>
+          <div id="updateResult" style="margin-top:8px;font-size:0.78rem"></div>
+        </div>
+
+        <!-- DELETE -->
+        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px">
+          <h3 style="color:var(--red);font-size:0.88rem;margin-bottom:12px">🗑 Kayıt Sil (DELETE)</h3>
+          <div class="field-group" style="margin-bottom:8px">
+            <label>Tablo</label>
+            <select id="deleteTable">
+              <option value="challenges">challenges</option>
+              <option value="daily_logs">daily_logs</option>
+              <option value="user_badges">user_badges</option>
+              <option value="users">users</option>
+            </select>
+          </div>
+          <div class="field-group" style="margin-bottom:8px">
+            <label>ID (silinecek satır)</label>
+            <input type="number" id="deleteId" placeholder="örn: 3" min="1">
+          </div>
+          <div style="background:#2d0f0f;border:1px solid var(--red);border-radius:6px;padding:8px;font-size:0.75rem;color:var(--red);margin-bottom:8px">
+            ⚠️ Bu işlem geri alınamaz. CASCADE ile bağlı kayıtlar da silinir.
+          </div>
+          <button class="btn btn-red" style="width:100%" onclick="doDelete()">🗑 Sil</button>
+          <div id="deleteResult" style="margin-top:8px;font-size:0.78rem"></div>
+        </div>
+
+        <!-- DDL -->
+        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px">
+          <h3 style="color:var(--purple);font-size:0.88rem;margin-bottom:12px">🏗️ Tablo İşlemleri (DDL)</h3>
+          <div class="field-group" style="margin-bottom:8px">
+            <label>İşlem Türü</label>
+            <select id="ddlType" onchange="renderDDL()">
+              <option value="alter_add">ALTER TABLE – Sütun Ekle</option>
+              <option value="alter_drop">ALTER TABLE – Sütun Sil</option>
+              <option value="create_index">CREATE INDEX</option>
+              <option value="truncate">TRUNCATE TABLE</option>
+            </select>
+          </div>
+          <div id="ddlForm"></div>
+          <button class="btn btn-ghost" style="margin-top:10px;width:100%;border-color:var(--purple);color:var(--purple)" onclick="doDDL()">▶ Çalıştır</button>
+          <div id="ddlResult" style="margin-top:8px;font-size:0.78rem"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ====== ŞEMA ====== -->
+    <div id="section-schema" class="section" style="padding:14px;overflow-y:auto">
+
+      <div class="schema-card">
+        <div class="schema-card-header"><span class="tname">🧑 users</span> <span class="tcnt">3 satır (demo)</span></div>
+        <table class="result" style="min-width:unset">
+          <thead><tr><th>Sütun</th><th>Tip</th><th>Null</th><th>Anahtar</th><th>Default</th></tr></thead>
+          <tbody>
+            <tr><td class="pk-cell">id</td><td class="num">INT</td><td style="color:var(--red)">NO</td><td style="color:var(--yellow)">PK</td><td class="null">AUTO_INCREMENT</td></tr>
+            <tr><td>username</td><td>VARCHAR(80)</td><td style="color:var(--red)">NO</td><td>UNIQUE</td><td class="null">NULL</td></tr>
+            <tr><td>email</td><td>VARCHAR(120)</td><td style="color:var(--red)">NO</td><td>UNIQUE</td><td class="null">NULL</td></tr>
+            <tr><td>password_hash</td><td>VARCHAR(256)</td><td style="color:var(--red)">NO</td><td></td><td class="null">NULL</td></tr>
+            <tr><td>created_at</td><td class="date">DATETIME</td><td style="color:var(--green)">YES</td><td></td><td>CURRENT_TIMESTAMP</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="schema-card">
+        <div class="schema-card-header"><span class="tname">🎯 challenges</span> <span class="tcnt">6 satır (demo) | FK → users.id</span></div>
+        <table class="result" style="min-width:unset">
+          <thead><tr><th>Sütun</th><th>Tip</th><th>Null</th><th>Anahtar</th><th>Default</th></tr></thead>
+          <tbody>
+            <tr><td class="pk-cell">id</td><td class="num">INT</td><td style="color:var(--red)">NO</td><td style="color:var(--yellow)">PK</td><td class="null">AUTO_INCREMENT</td></tr>
+            <tr><td style="color:#a5f3fc">user_id</td><td class="num">INT</td><td style="color:var(--red)">NO</td><td style="color:#a5f3fc">FK</td><td class="null">NULL</td></tr>
+            <tr><td>title</td><td>VARCHAR(200)</td><td style="color:var(--red)">NO</td><td></td><td class="null">NULL</td></tr>
+            <tr><td>description</td><td>TEXT</td><td style="color:var(--green)">YES</td><td></td><td class="null">NULL</td></tr>
+            <tr><td>start_date</td><td class="date">DATE</td><td style="color:var(--red)">NO</td><td></td><td class="null">NULL</td></tr>
+            <tr><td>end_date</td><td class="date">DATE</td><td style="color:var(--red)">NO</td><td></td><td class="null">NULL</td></tr>
+            <tr><td>category</td><td>VARCHAR(50)</td><td style="color:var(--green)">YES</td><td></td><td>'Diğer'</td></tr>
+            <tr><td>status</td><td>VARCHAR(20)</td><td style="color:var(--green)">YES</td><td></td><td>'active'</td></tr>
+            <tr><td>created_at</td><td class="date">DATETIME</td><td style="color:var(--green)">YES</td><td></td><td>CURRENT_TIMESTAMP</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="schema-card">
+        <div class="schema-card-header"><span class="tname">📅 daily_logs</span> <span class="tcnt">35 satır (demo) | FK → challenges.id | UNIQUE(challenge_id, log_date)</span></div>
+        <table class="result" style="min-width:unset">
+          <thead><tr><th>Sütun</th><th>Tip</th><th>Null</th><th>Anahtar</th><th>Default</th></tr></thead>
+          <tbody>
+            <tr><td class="pk-cell">id</td><td class="num">INT</td><td style="color:var(--red)">NO</td><td style="color:var(--yellow)">PK</td><td class="null">AUTO_INCREMENT</td></tr>
+            <tr><td style="color:#a5f3fc">challenge_id</td><td class="num">INT</td><td style="color:var(--red)">NO</td><td style="color:#a5f3fc">FK</td><td class="null">NULL</td></tr>
+            <tr><td>log_date</td><td class="date">DATE</td><td style="color:var(--red)">NO</td><td>UNIQUE</td><td class="null">NULL</td></tr>
+            <tr><td>status</td><td>VARCHAR(20)</td><td style="color:var(--red)">NO</td><td></td><td class="null">NULL</td></tr>
+            <tr><td>notes</td><td>TEXT</td><td style="color:var(--green)">YES</td><td></td><td class="null">NULL</td></tr>
+            <tr><td>created_at</td><td class="date">DATETIME</td><td style="color:var(--green)">YES</td><td></td><td>CURRENT_TIMESTAMP</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="schema-card">
+        <div class="schema-card-header"><span class="tname">🏅 badges</span> <span class="tcnt">4 satır (demo)</span></div>
+        <table class="result" style="min-width:unset">
+          <thead><tr><th>Sütun</th><th>Tip</th><th>Null</th><th>Anahtar</th><th>Default</th></tr></thead>
+          <tbody>
+            <tr><td class="pk-cell">id</td><td class="num">INT</td><td style="color:var(--red)">NO</td><td style="color:var(--yellow)">PK</td><td class="null">AUTO_INCREMENT</td></tr>
+            <tr><td>name</td><td>VARCHAR(100)</td><td style="color:var(--red)">NO</td><td>UNIQUE</td><td class="null">NULL</td></tr>
+            <tr><td>description</td><td>TEXT</td><td style="color:var(--green)">YES</td><td></td><td class="null">NULL</td></tr>
+            <tr><td>icon_url</td><td>VARCHAR(255)</td><td style="color:var(--green)">YES</td><td></td><td class="null">NULL</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="schema-card">
+        <div class="schema-card-header"><span class="tname">🔗 user_badges</span> <span class="tcnt">8 satır (demo) | FK → users.id, badges.id | UNIQUE(user_id, badge_id)</span></div>
+        <table class="result" style="min-width:unset">
+          <thead><tr><th>Sütun</th><th>Tip</th><th>Null</th><th>Anahtar</th><th>Default</th></tr></thead>
+          <tbody>
+            <tr><td class="pk-cell">id</td><td class="num">INT</td><td style="color:var(--red)">NO</td><td style="color:var(--yellow)">PK</td><td class="null">AUTO_INCREMENT</td></tr>
+            <tr><td style="color:#a5f3fc">user_id</td><td class="num">INT</td><td style="color:var(--red)">NO</td><td style="color:#a5f3fc">FK</td><td class="null">NULL</td></tr>
+            <tr><td style="color:#a5f3fc">badge_id</td><td class="num">INT</td><td style="color:var(--red)">NO</td><td style="color:#a5f3fc">FK</td><td class="null">NULL</td></tr>
+            <tr><td>earned_at</td><td class="date">DATETIME</td><td style="color:var(--green)">YES</td><td></td><td>CURRENT_TIMESTAMP</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ====== BAĞLANTI KONFİG ====== -->
+    <div id="section-config" class="section" style="overflow-y:auto">
+      <div style="padding:16px 16px 0;font-size:0.88rem;color:var(--blue);font-weight:700">⚙️ Veritabanı Bağlantı Ayarları</div>
+      <div class="config-grid">
+        <div class="field-group">
+          <label>Veritabanı Türü</label>
+          <select id="dbType" onchange="toggleDbType()">
+            <option value="mysql">MySQL / MariaDB</option>
+            <option value="sqlite">SQLite (Yerel Dosya)</option>
+            <option value="postgres">PostgreSQL</option>
+          </select>
+        </div>
+        <div class="field-group" id="hostField">
+          <label>Host / Sunucu</label>
+          <input type="text" id="dbHost" value="localhost" placeholder="localhost veya IP">
+        </div>
+        <div class="field-group" id="portField">
+          <label>Port</label>
+          <input type="number" id="dbPort" value="3306" placeholder="3306">
+        </div>
+        <div class="field-group" id="dbNameField">
+          <label>Veritabanı Adı</label>
+          <input type="text" id="dbName" value="challenge_tracker" placeholder="challenge_tracker">
+        </div>
+        <div class="field-group" id="userField">
+          <label>Kullanıcı Adı</label>
+          <input type="text" id="dbUser" value="root" placeholder="root">
+        </div>
+        <div class="field-group" id="passField">
+          <label>Şifre</label>
+          <input type="password" id="dbPass" placeholder="••••••••">
+        </div>
+        <div class="field-group" id="sslField">
+          <label>SSL Modu</label>
+          <select id="dbSSL">
+            <option value="disable">Devre Dışı</option>
+            <option value="require">Zorunlu</option>
+            <option value="verify">Doğrula</option>
+          </select>
+        </div>
+        <div class="field-group" id="charsetField">
+          <label>Karakter Seti</label>
+          <select id="dbCharset">
+            <option value="utf8mb4">utf8mb4 (önerilen)</option>
+            <option value="utf8">utf8</option>
+            <option value="latin1">latin1</option>
+          </select>
+        </div>
+        <div class="full-width" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:monospace;font-size:0.78rem;color:var(--muted)">
+          <div style="color:var(--muted);margin-bottom:6px;font-size:0.72rem;font-family:sans-serif;font-weight:600">Python db_connection.py – Bağlantı Dizesi Önizlemesi</div>
+          <span id="connString" style="color:var(--green)">mysql+pymysql://root:••••@localhost:3306/challenge_tracker?charset=utf8mb4</span>
+        </div>
+        <div class="conn-test-result" id="connTestResult"></div>
+        <div class="full-width" style="display:flex;gap:8px">
+          <button class="btn btn-blue" onclick="testConnection()">🔌 Bağlantıyı Test Et</button>
+          <button class="btn btn-green" onclick="saveConfig()">💾 Kaydet & Uygula</button>
+          <button class="btn btn-ghost" onclick="loadPreset('local')">📦 Yerel Preset</button>
+          <button class="btn btn-ghost" onclick="loadPreset('planetscale')">☁️ PlanetScale</button>
+          <button class="btn btn-ghost" onclick="loadPreset('railway')">🚂 Railway</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<!-- CRUD MODAL -->
+<div class="modal-overlay" id="crudModal">
+  <div class="modal">
+    <h3 id="modalTitle">Yeni Satır Ekle</h3>
+    <div id="modalFields"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">İptal</button>
+      <button class="btn btn-green" onclick="submitModal()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── DEMO DATA ─────────────────────────────────────────────
+const DB = {
+  users: [
+    {id:1, username:'ali_dev',  email:'ali@example.com',    password_hash:'pbkdf2:sha256:260000$...', created_at:'2026-05-01 10:00:00'},
+    {id:2, username:'zeynep_t', email:'zeynep@example.com', password_hash:'pbkdf2:sha256:260000$...', created_at:'2026-05-15 09:00:00'},
+    {id:3, username:'mehmet_y', email:'mehmet@example.com', password_hash:'pbkdf2:sha256:260000$...', created_at:'2026-03-01 08:00:00'},
+  ],
+  challenges: [
+    {id:1, user_id:1, title:'30 Gün Kod',       category:'Yazılım',       status:'completed', start_date:'2026-05-01', end_date:'2026-05-30', created_at:'2026-05-01 10:00:00'},
+    {id:2, user_id:1, title:'100 Gün Flutter',   category:'Yazılım',       status:'active',    start_date:'2026-06-01', end_date:'2026-09-08', created_at:'2026-06-01 09:00:00'},
+    {id:3, user_id:2, title:'Sabah Koşusu',      category:'Spor & Sağlık', status:'active',    start_date:'2026-05-15', end_date:'2026-06-14', created_at:'2026-05-15 09:00:00'},
+    {id:4, user_id:2, title:'Almanca B1',        category:'Yabancı Dil',   status:'active',    start_date:'2026-04-01', end_date:'2026-06-30', created_at:'2026-04-01 08:00:00'},
+    {id:5, user_id:3, title:'Kitap Okuma',       category:'Kitap Okuma',   status:'completed', start_date:'2026-03-01', end_date:'2026-03-31', created_at:'2026-03-01 08:00:00'},
+    {id:6, user_id:3, title:'Diyet Takibi',      category:'Spor & Sağlık', status:'failed',    start_date:'2026-06-01', end_date:'2026-06-30', created_at:'2026-06-01 08:00:00'},
+  ],
+  daily_logs: [
+    {id:1, challenge_id:1, log_date:'2026-05-01', status:'completed', notes:'İlk gün!', created_at:'2026-05-01 22:00:00'},
+    {id:2, challenge_id:1, log_date:'2026-05-02', status:'completed', notes:'Algoritma soruları.', created_at:'2026-05-02 22:00:00'},
+    {id:3, challenge_id:1, log_date:'2026-05-03', status:'completed', notes:'Flask routing.', created_at:'2026-05-03 22:00:00'},
+    {id:4, challenge_id:1, log_date:'2026-05-04', status:'completed', notes:'DB bağlantısı.', created_at:'2026-05-04 22:00:00'},
+    {id:5, challenge_id:1, log_date:'2026-05-05', status:'completed', notes:'API endpoint.', created_at:'2026-05-05 22:00:00'},
+    {id:6, challenge_id:1, log_date:'2026-05-06', status:'completed', notes:'Frontend enteg.', created_at:'2026-05-06 22:00:00'},
+    {id:7, challenge_id:1, log_date:'2026-05-07', status:'completed', notes:'7 günlük seri!', created_at:'2026-05-07 22:00:00'},
+    {id:8, challenge_id:1, log_date:'2026-05-08', status:'missed',    notes:null,          created_at:'2026-05-08 23:59:00'},
+    {id:9, challenge_id:2, log_date:'2026-06-01', status:'completed', notes:'Dart temelleri.', created_at:'2026-06-01 22:00:00'},
+    {id:10,challenge_id:2, log_date:'2026-06-02', status:'completed', notes:'İlk widget.',   created_at:'2026-06-02 22:00:00'},
+    {id:11,challenge_id:2, log_date:'2026-06-13', status:'completed', notes:'Bugün tamamlandı!', created_at:'2026-06-13 20:00:00'},
+    {id:12,challenge_id:3, log_date:'2026-05-15', status:'completed', notes:'3.2 km, 22 dk.', created_at:'2026-05-15 08:00:00'},
+    {id:13,challenge_id:3, log_date:'2026-05-16', status:'completed', notes:'3.5 km.',       created_at:'2026-05-16 08:00:00'},
+    {id:14,challenge_id:3, log_date:'2026-05-18', status:'missed',    notes:null,            created_at:'2026-05-18 23:59:00'},
+    {id:15,challenge_id:3, log_date:'2026-06-13', status:'completed', notes:'5.5 km.',       created_at:'2026-06-13 07:30:00'},
+  ],
+  badges: [
+    {id:1, name:'İlk Adım',           description:'İlk challenge oluşturuldu.',   icon_url:'/icons/badge_first.png'},
+    {id:2, name:'İstikrar Başlangıcı',description:'3 günlük seri tamamlandı.',    icon_url:'/icons/badge_3streak.png'},
+    {id:3, name:'Haftalık Savaşçı',   description:'7 günlük seri tamamlandı.',    icon_url:'/icons/badge_7streak.png'},
+    {id:4, name:'Fatih',              description:'1 challenge başarıyla bitti.',  icon_url:'/icons/badge_conqueror.png'},
+  ],
+  user_badges: [
+    {id:1, user_id:1, badge_id:1, earned_at:'2026-05-01 10:00:00'},
+    {id:2, user_id:1, badge_id:2, earned_at:'2026-05-04 18:00:00'},
+    {id:3, user_id:1, badge_id:3, earned_at:'2026-05-08 18:00:00'},
+    {id:4, user_id:1, badge_id:4, earned_at:'2026-05-30 23:59:00'},
+    {id:5, user_id:2, badge_id:1, earned_at:'2026-05-15 09:00:00'},
+    {id:6, user_id:2, badge_id:2, earned_at:'2026-05-18 09:00:00'},
+    {id:7, user_id:3, badge_id:1, earned_at:'2026-03-01 08:00:00'},
+    {id:8, user_id:3, badge_id:4, earned_at:'2026-03-31 23:59:00'},
+  ]
+};
+
+// ─── SNIPPETS ──────────────────────────────────────────────
+const SNIPPETS = {
+  select_all:    "SELECT * FROM users ORDER BY created_at DESC;",
+  join_ch:       "SELECT u.username, c.title, c.category, c.status,\n       c.start_date, c.end_date\nFROM users u\nINNER JOIN challenges c ON u.id = c.user_id\nORDER BY c.created_at DESC;",
+  stats:         "SELECT u.username,\n       COUNT(c.id)                                        AS toplam_challenge,\n       SUM(CASE WHEN c.status = 'completed' THEN 1 ELSE 0 END) AS tamamlanan,\n       SUM(CASE WHEN c.status = 'active'    THEN 1 ELSE 0 END) AS aktif,\n       SUM(CASE WHEN c.status = 'failed'    THEN 1 ELSE 0 END) AS basarisiz\nFROM users u\nLEFT JOIN challenges c ON u.id = c.user_id\nGROUP BY u.id, u.username\nORDER BY tamamlanan DESC;",
+  streak:        "SELECT c.title, u.username,\n       COUNT(d.id)  AS tamamlanan_gun,\n       MIN(d.log_date) AS ilk_log,\n       MAX(d.log_date) AS son_log\nFROM challenges c\nJOIN users u        ON c.user_id = u.id\nJOIN daily_logs d   ON c.id = d.challenge_id\nWHERE d.status = 'completed'\nGROUP BY c.id, c.title, u.username\nORDER BY tamamlanan_gun DESC;",
+  badges_report: "SELECT u.username, b.name AS rozet, b.description,\n       ub.earned_at\nFROM user_badges ub\nJOIN users u  ON ub.user_id  = u.id\nJOIN badges b ON ub.badge_id = b.id\nORDER BY ub.earned_at ASC;",
+  active:        "SELECT u.username, c.title, c.category,\n       c.start_date, c.end_date,\n       DATEDIFF(c.end_date, CURDATE()) AS kalan_gun\nFROM challenges c\nJOIN users u ON c.user_id = u.id\nWHERE c.status = 'active'\nORDER BY kalan_gun ASC;",
+  insert_user:   "INSERT INTO users (username, email, password_hash)\nVALUES ('yeni_kullanici', 'yeni@example.com', 'pbkdf2:sha256:...');",
+  update_status: "UPDATE challenges\nSET status = 'completed'\nWHERE id = 2;",
+  delete_log:    "DELETE FROM daily_logs\nWHERE id = 8;",
+  create_table:  "CREATE TABLE IF NOT EXISTS challenges (\n  id          INT AUTO_INCREMENT PRIMARY KEY,\n  user_id     INT          NOT NULL,\n  title       VARCHAR(200) NOT NULL,\n  description TEXT,\n  start_date  DATE         NOT NULL,\n  end_date    DATE         NOT NULL,\n  category    VARCHAR(50)  DEFAULT 'Diğer',\n  status      VARCHAR(20)  DEFAULT 'active',\n  created_at  DATETIME     DEFAULT CURRENT_TIMESTAMP,\n  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE\n);",
+  alter_table:   "ALTER TABLE users\nADD COLUMN avatar_url VARCHAR(255) DEFAULT NULL\nAFTER email;",
+  drop_table:    "-- ⚠️ DİKKAT: Geri alınamaz!\nDROP TABLE IF EXISTS daily_logs;",
+};
+
+// ─── STATE ─────────────────────────────────────────────────
+let currentTable = 'users';
+let connected    = false;
+let nextId       = { users:4, challenges:7, daily_logs:16, badges:5, user_badges:9 };
+
+// ─── NAV ───────────────────────────────────────────────────
+function show(id, el) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('section-'+id).classList.add('active');
+  if(el) el.classList.add('active');
+  if(id==='tables') renderTableView();
+  if(id==='crud')   { renderInsertForm(); renderUpdateForm(); renderDDL(); }
+}
+
+// ─── SIDEBAR TABLE SELECT ──────────────────────────────────
+function selectTable(tbl, el) {
+  currentTable = tbl;
+  document.querySelectorAll('.sidebar-item[data-table]').forEach(i=>i.classList.remove('active'));
+  el.classList.add('active');
+  show('tables');
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('navTables').classList.add('active');
+}
+
+// ─── QUERY EDITOR ──────────────────────────────────────────
+function editorKeydown(e) {
+  if(e.ctrlKey && e.key==='Enter') { e.preventDefault(); runQuery(); }
+  if(e.key==='Tab') { e.preventDefault(); insertSnip('  '); }
+}
+function insertSnip(txt) {
+  const ta = document.getElementById('sqlEditor');
+  const s=ta.selectionStart, en=ta.selectionEnd;
+  ta.value = ta.value.slice(0,s)+txt+ta.value.slice(en);
+  ta.selectionStart = ta.selectionEnd = s+txt.length;
+  ta.focus();
+}
+function clearEditor() { document.getElementById('sqlEditor').value=''; document.getElementById('queryResult').innerHTML=''; document.getElementById('execTime').textContent=''; }
+function formatSQL() {
+  const ta = document.getElementById('sqlEditor');
+  let sql = ta.value.trim();
+  const keywords = ['SELECT','FROM','WHERE','JOIN','INNER JOIN','LEFT JOIN','RIGHT JOIN','ON','ORDER BY','GROUP BY','HAVING','LIMIT','INSERT INTO','VALUES','UPDATE','SET','DELETE FROM','CREATE TABLE','ALTER TABLE','DROP TABLE','ADD COLUMN','FOREIGN KEY','REFERENCES'];
+  keywords.forEach(k => { sql = sql.replace(new RegExp('\\b'+k+'\\b','gi'), '\n'+k); });
+  ta.value = sql.trim().replace(/\n\n+/g,'\n');
+}
+function loadFromSelect() {
+  const v = document.getElementById('snippetSelect').value;
+  if(v && SNIPPETS[v]) document.getElementById('sqlEditor').value = SNIPPETS[v];
+}
+function loadSnippet(k) { document.getElementById('sqlEditor').value = SNIPPETS[k]||''; show('query'); document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active')); document.getElementById('navQuery').classList.add('active'); }
+
+function runQuery() {
+  const sql = document.getElementById('sqlEditor').value.trim();
+  if(!sql) return;
+  const t0 = performance.now();
+  const result = execSQL(sql);
+  const ms = (performance.now()-t0).toFixed(1);
+  document.getElementById('execTime').textContent = `${ms} ms`;
+  renderQueryResult(result);
+}
+
+function execSQL(sql) {
+  const norm = sql.toUpperCase().trim();
+  try {
+    // SELECT
+    if(norm.startsWith('SELECT')) {
+      return execSelect(sql);
+    }
+    // INSERT
+    if(norm.startsWith('INSERT INTO')) {
+      return execInsertSQL(sql);
+    }
+    // UPDATE
+    if(norm.startsWith('UPDATE')) {
+      return execUpdateSQL(sql);
+    }
+    // DELETE
+    if(norm.startsWith('DELETE FROM')) {
+      return execDeleteSQL(sql);
+    }
+    // DDL (simulated)
+    if(norm.startsWith('ALTER') || norm.startsWith('CREATE') || norm.startsWith('DROP') || norm.startsWith('TRUNCATE')) {
+      return { type:'ddl', msg: `DDL sorgusu simüle edildi: ${sql.split('\n')[0]}` };
+    }
+    return { type:'error', msg:'Desteklenmeyen sorgu türü (Demo mod: SELECT, INSERT, UPDATE, DELETE, DDL)' };
+  } catch(e) {
+    return { type:'error', msg: e.message };
+  }
+}
+
+function execSelect(sql) {
+  const norm = sql.toUpperCase();
+  // Detect table
+  let tbl = null;
+  for(const t of Object.keys(DB)) { if(norm.includes(t.toUpperCase())) { tbl=t; break; } }
+
+  // Handle aggregate / join queries
+  if(norm.includes('COUNT(') || norm.includes('SUM(') || norm.includes('JOIN')) {
+    return buildDerivedResult(norm, sql);
+  }
+  if(!tbl) return { type:'error', msg:'Tablo bulunamadı.' };
+
+  let rows = [...DB[tbl]];
+
+  // WHERE id = X
+  const whereId = sql.match(/WHERE\s+id\s*=\s*(\d+)/i);
+  if(whereId) rows = rows.filter(r=>r.id==parseInt(whereId[1]));
+
+  // WHERE status = '...'
+  const whereStatus = sql.match(/WHERE\s+\w+\s*=\s*'([^']+)'/i);
+  if(whereStatus && !whereId) rows = rows.filter(r=>Object.values(r).some(v=>v==whereStatus[1]));
+
+  // ORDER BY
+  const orderM = sql.match(/ORDER\s+BY\s+(\w+)\s*(ASC|DESC)?/i);
+  if(orderM) {
+    const col=orderM[1].toLowerCase(), dir=(orderM[2]||'ASC').toUpperCase();
+    rows.sort((a,b)=> dir==='ASC' ? (a[col]>b[col]?1:-1) : (a[col]<b[col]?1:-1));
+  }
+
+  // LIMIT
+  const limitM = sql.match(/LIMIT\s+(\d+)/i);
+  if(limitM) rows = rows.slice(0,parseInt(limitM[1]));
+
+  return { type:'select', rows, cols:Object.keys(DB[tbl][0]||{}) };
+}
+
+function buildDerivedResult(norm, sql) {
+  if(norm.includes('BADGES_REPORT') || (norm.includes('USER_BADGES') && norm.includes('BADGES'))) {
+    const rows = DB.user_badges.map(ub=>({
+      username: DB.users.find(u=>u.id===ub.user_id)?.username,
+      rozet:    DB.badges.find(b=>b.id===ub.badge_id)?.name,
+      description: DB.badges.find(b=>b.id===ub.badge_id)?.description,
+      earned_at: ub.earned_at
+    }));
+    return { type:'select', rows, cols:['username','rozet','description','earned_at'] };
+  }
+  if(norm.includes('TAMAMLANAN_GUN') || (norm.includes('DAILY_LOGS') && norm.includes('COUNT'))) {
+    const rows = DB.challenges.map(c=>({
+      title: c.title,
+      username: DB.users.find(u=>u.id===c.user_id)?.username,
+      tamamlanan_gun: DB.daily_logs.filter(d=>d.challenge_id===c.id && d.status==='completed').length,
+      ilk_log: DB.daily_logs.filter(d=>d.challenge_id===c.id).sort((a,b)=>a.log_date>b.log_date?1:-1)[0]?.log_date || null,
+      son_log:  DB.daily_logs.filter(d=>d.challenge_id===c.id).sort((a,b)=>a.log_date<b.log_date?1:-1)[0]?.log_date || null,
+    })).filter(r=>r.tamamlanan_gun>0).sort((a,b)=>b.tamamlanan_gun-a.tamamlanan_gun);
+    return { type:'select', rows, cols:['title','username','tamamlanan_gun','ilk_log','son_log'] };
+  }
+  if(norm.includes('TOPLAM_CHALLENGE') || norm.includes('TAMAMLANAN')) {
+    const rows = DB.users.map(u=>{
+      const chs = DB.challenges.filter(c=>c.user_id===u.id);
+      return {
+        username: u.username,
+        toplam_challenge: chs.length,
+        tamamlanan: chs.filter(c=>c.status==='completed').length,
+        aktif:      chs.filter(c=>c.status==='active').length,
+        basarisiz:  chs.filter(c=>c.status==='failed').length,
+      };
+    }).sort((a,b)=>b.tamamlanan-a.tamamlanan);
+    return { type:'select', rows, cols:['username','toplam_challenge','tamamlanan','aktif','basarisiz'] };
+  }
+  if(norm.includes('KALAN_GUN') || (norm.includes('CHALLENGES') && norm.includes('USERS') && norm.includes('JOIN'))) {
+    const today = new Date('2026-06-13');
+    const rows = DB.challenges.filter(c=>c.status==='active').map(c=>({
+      username: DB.users.find(u=>u.id===c.user_id)?.username,
+      title: c.title,
+      category: c.category,
+      start_date: c.start_date,
+      end_date: c.end_date,
+      kalan_gun: Math.ceil((new Date(c.end_date)-today)/(1000*60*60*24))
+    })).sort((a,b)=>a.kalan_gun-b.kalan_gun);
+    return { type:'select', rows, cols:['username','title','category','start_date','end_date','kalan_gun'] };
+  }
+  // Generic join fallback
+  if(norm.includes('CHALLENGES') && norm.includes('USERS')) {
+    const rows = DB.challenges.map(c=>({
+      username: DB.users.find(u=>u.id===c.user_id)?.username,
+      title: c.title, category: c.category, status: c.status, start_date: c.start_date, end_date: c.end_date
+    }));
+    return { type:'select', rows, cols:['username','title','category','status','start_date','end_date'] };
+  }
+  return { type:'select', rows:[], cols:[], note:'Sonuç bulunamadı (demo).' };
+}
+
+function execInsertSQL(sql) {
+  const tblM = sql.match(/INSERT\s+INTO\s+(\w+)/i);
+  if(!tblM) throw new Error('Tablo adı bulunamadı.');
+  const tbl = tblM[1].toLowerCase();
+  if(!DB[tbl]) throw new Error(`Tablo bulunamadı: ${tbl}`);
+  const colsM = sql.match(/\(([^)]+)\)\s*VALUES/i);
+  const valsM = sql.match(/VALUES\s*\(([^)]+)\)/i);
+  const newRow = { id: nextId[tbl]++ };
+  if(colsM && valsM) {
+    const cols = colsM[1].split(',').map(s=>s.trim());
+    const vals = valsM[1].split(',').map(s=>s.trim().replace(/^['""|'"]$/g,'').replace(/^'/,'').replace(/'$/,'').replace(/^"/,'').replace(/"$/,''));
+    cols.forEach((c,i)=>{ newRow[c] = vals[i]??null; });
+  }
+  newRow.created_at = new Date().toISOString().slice(0,19).replace('T',' ');
+  DB[tbl].push(newRow);
+  updateRowCounts();
+  return { type:'ok', msg:`✅ Yeni satır eklendi: ${tbl} (id=${newRow.id})`, affected:1 };
+}
+
+function execUpdateSQL(sql) {
+  const tblM = sql.match(/UPDATE\s+(\w+)/i);
+  if(!tblM) throw new Error('Tablo adı bulunamadı.');
+  const tbl = tblM[1].toLowerCase();
+  const whereM = sql.match(/WHERE\s+id\s*=\s*(\d+)/i);
+  const idVal = whereM ? parseInt(whereM[1]) : null;
+  let affected = 0;
+  if(idVal && DB[tbl]) {
+    const idx = DB[tbl].findIndex(r=>r.id===idVal);
+    if(idx>=0) {
+      // SET bölümünü WHERE öncesinde al, birden fazla col=val parse et
+      const setSection = sql.match(/SET\s+(.+?)(?:\s+WHERE|$)/is);
+      if(setSection) {
+        const pairs = setSection[1].split(',');
+        pairs.forEach(pair => {
+          const m = pair.match(/\s*(\w+)\s*=\s*'?([^',]+)'?\s*/);
+          if(m) DB[tbl][idx][m[1].trim()] = m[2].trim().replace(/['"]/g,'');
+        });
+      }
+      affected = 1;
+    }
+  }
+  updateRowCounts();
+  return { type:'ok', msg:`✅ Güncellendi: ${tbl} WHERE id=${idVal}`, affected };
+}
+
+function execDeleteSQL(sql) {
+  const tblM = sql.match(/DELETE\s+FROM\s+(\w+)/i);
+  if(!tblM) throw new Error('Tablo adı bulunamadı.');
+  const tbl = tblM[1].toLowerCase();
+  const whereM = sql.match(/WHERE\s+id\s*=\s*(\d+)/i);
+  const idVal = whereM ? parseInt(whereM[1]) : null;
+  let affected = 0;
+  if(idVal && DB[tbl]) {
+    const before = DB[tbl].length;
+    DB[tbl] = DB[tbl].filter(r=>r.id!==idVal);
+    affected = before - DB[tbl].length;
+  }
+  updateRowCounts();
+  return { type:'ok', msg:`🗑 Silindi: ${tbl} WHERE id=${idVal} (${affected} satır)`, affected };
+}
+
+// ─── RENDER QUERY RESULT ──────────────────────────────────
+function renderQueryResult(res) {
+  const el = document.getElementById('queryResult');
+  if(res.type==='error') {
+    el.innerHTML=`<div class="result-meta"><span class="tag tag-err">HATA</span><span style="color:var(--red);font-size:0.8rem">${res.msg}</span></div>`;
+    return;
+  }
+  if(res.type==='ok'||res.type==='ddl') {
+    el.innerHTML=`<div class="result-meta"><span class="tag tag-ok">✓ BAŞARILI</span><span style="color:var(--text);font-size:0.8rem">${res.msg||''}</span>${res.affected!=null?`<span style="color:var(--muted);font-size:0.75rem">${res.affected} satır etkilendi</span>`:''}</div>`;
+    return;
+  }
+  if(res.type==='select') {
+    const rows=res.rows, cols=res.cols;
+    if(!rows.length) { el.innerHTML=`<div class="result-meta"><span class="tag tag-info">ℹ</span><span style="color:var(--muted)">Sonuç bulunamadı. ${res.note||''}</span></div>`; return; }
+    let html=`<div class="result-meta"><span class="tag tag-ok">✓ SELECT</span><span style="color:var(--muted);font-size:0.75rem">${rows.length} satır döndü</span></div><div style="overflow-x:auto"><table class="result"><thead><tr>`;
+    cols.forEach(c=>{ html+=`<th>${c}</th>`; });
+    html+=`</tr></thead><tbody>`;
+    rows.forEach(r=>{
+      html+=`<tr>`;
+      cols.forEach(c=>{
+        const v=r[c];
+        let cls='';
+        if(c==='id') cls='pk-cell';
+        else if(c==='status'&&v==='completed') cls='status-completed';
+        else if(c==='status'&&v==='missed')    cls='status-missed';
+        else if(c==='status'&&v==='active')    cls='status-active';
+        else if(c==='status'&&v==='failed')    cls='status-failed';
+        else if(typeof v==='number') cls='num';
+        else if(c.includes('date')||c.includes('at')) cls='date';
+        html+=`<td class="${cls}">${v==null?`<span class="null">NULL</span>`:v}</td>`;
+      });
+      html+=`</tr>`;
+    });
+    html+=`</tbody></table></div>`;
+    el.innerHTML=html;
+  }
+}
+
+// ─── TABLE MANAGER ─────────────────────────────────────────
+function renderTableView() {
+  const rows = DB[currentTable];
+  if(!rows||!rows.length) { document.getElementById('tableResult').innerHTML='<p style="color:var(--muted);padding:20px">Veri yok.</p>'; return; }
+  document.getElementById('tableTitle').textContent = '📋 ' + currentTable;
+  document.getElementById('tableSubtitle').textContent = rows.length + ' satır';
+  const cols = Object.keys(rows[0]);
+  let html=`<div style="overflow-x:auto"><table class="result" id="mainTable"><thead><tr>`;
+  cols.forEach(c=>html+=`<th>${c}</th>`);
+  html+=`<th>İşlemler</th></tr></thead><tbody>`;
+  rows.forEach(r=>{
+    html+=`<tr>`;
+    cols.forEach(c=>{
+      const v=r[c];
+      let cls='';
+      if(c==='id') cls='pk-cell';
+      else if(c==='status'&&v==='completed') cls='status-completed';
+      else if(c==='status'&&v==='missed')    cls='status-missed';
+      else if(c==='status'&&v==='active')    cls='status-active';
+      else if(c==='status'&&v==='failed')    cls='status-failed';
+      else if(typeof v==='number') cls='num';
+      else if(c.includes('date')||c.includes('at')) cls='date';
+      html+=`<td class="${cls}">${v==null?`<span class="null">NULL</span>`:String(v).length>40?String(v).slice(0,40)+'…':v}</td>`;
+    });
+    html+=`<td><div class="action-cell">
+      <button class="btn btn-ghost btn-sm" onclick="editRow('${currentTable}',${r.id})">✏️</button>
+      <button class="btn btn-red btn-sm" onclick="deleteRow('${currentTable}',${r.id})">🗑</button>
+    </div></td></tr>`;
+  });
+  html+=`</tbody></table></div>`;
+  document.getElementById('tableResult').innerHTML=html;
+}
+function filterTable() {
+  const q=document.getElementById('tableSearch').value.toLowerCase();
+  document.querySelectorAll('#mainTable tbody tr').forEach(tr=>{
+    tr.style.display=tr.textContent.toLowerCase().includes(q)?'':'none';
+  });
+}
+function refreshTable() { renderTableView(); }
+// STATUS seçenekleri her tablo için
+const STATUS_OPTS = {
+  challenges: ['active','completed','failed'],
+  daily_logs: ['completed','missed','pending'],
+};
+
+function getModalFields(tbl) {
+  return Object.keys(DB[tbl][0]||{}).filter(c=>c!=='id'&&c!=='created_at'&&c!=='earned_at');
+}
+
+function buildModalHTML(tbl, row) {
+  // row=null → yeni ekleme, row=obj → düzenleme
+  return getModalFields(tbl).map(f => {
+    const val = row ? (row[f]??'') : '';
+    // status alanı → select
+    if(f==='status' && STATUS_OPTS[tbl]) {
+      const opts = STATUS_OPTS[tbl].map(o=>`<option value="${o}"${o===val?' selected':''}>${o}</option>`).join('');
+      return `<div class="field-group" style="margin-bottom:8px">
+        <label>${f}</label>
+        <select id="mf_${f}" data-key="${f}">${opts}</select>
+      </div>`;
+    }
+    // tarih alanı → date input
+    const inputType = f.includes('date') ? 'date' : (f==='user_id'||f==='challenge_id'||f==='badge_id') ? 'number' : 'text';
+    return `<div class="field-group" style="margin-bottom:8px">
+      <label>${f}</label>
+      <input type="${inputType}" id="mf_${f}" data-key="${f}" value="${val}" placeholder="${f}">
+    </div>`;
+  }).join('');
+}
+
+function readModalValues() {
+  const mf = document.getElementById('modalFields');
+  const vals = {};
+  mf.querySelectorAll('input[data-key], select[data-key]').forEach(el => {
+    vals[el.dataset.key] = el.value || null;
+  });
+  return vals;
+}
+
+function openAddModal() {
+  document.getElementById('modalTitle').textContent = 'Yeni Satır Ekle – ' + currentTable;
+  document.getElementById('modalFields').innerHTML = buildModalHTML(currentTable, null);
+  delete document.getElementById('modalFields').dataset.editId;
+  delete document.getElementById('modalFields').dataset.editTable;
+  document.getElementById('crudModal').classList.add('show');
+}
+
+function editRow(tbl, id) {
+  const row = DB[tbl].find(r => r.id === id);
+  if(!row) return;
+  document.getElementById('modalTitle').textContent = `Düzenle – ${tbl}  id=${id}`;
+  document.getElementById('modalFields').innerHTML = buildModalHTML(tbl, row);
+  document.getElementById('modalFields').dataset.editId    = id;
+  document.getElementById('modalFields').dataset.editTable = tbl;
+  document.getElementById('crudModal').classList.add('show');
+}
+
+function submitModal() {
+  const mf        = document.getElementById('modalFields');
+  const editId    = mf.dataset.editId;
+  const editTable = mf.dataset.editTable || currentTable;
+  const vals      = readModalValues();
+
+  if(editId) {
+    // GÜNCELLEME
+    const row = DB[editTable].find(r => r.id == parseInt(editId));
+    if(row) {
+      Object.assign(row, vals);           // tüm alanları tek seferde yaz
+      showToast(`✅ ${editTable} id=${editId} güncellendi`, 'ok');
+    }
+  } else {
+    // YENİ EKLEME
+    const newId  = nextId[editTable]++;
+    const newRow = { id: newId, ...vals, created_at: new Date().toISOString().slice(0,19).replace('T',' ') };
+    DB[editTable].push(newRow);
+    showToast(`✅ Yeni satır eklendi (${editTable} id=${newId})`, 'ok');
+  }
+
+  delete mf.dataset.editId;
+  delete mf.dataset.editTable;
+  closeModal();
+  updateRowCounts();   // sidebar sayaçları güncelle
+  renderTableView();
+}
+
+function deleteRow(tbl, id) {
+  if(!confirm(`${tbl} tablosundan id=${id} silinsin mi?`)) return;
+  DB[tbl] = DB[tbl].filter(r => r.id !== id);
+  showToast(`🗑 id=${id} silindi`, 'err');
+  updateRowCounts();
+  renderTableView();
+}
+
+function closeModal() {
+  document.getElementById('crudModal').classList.remove('show');
+  document.getElementById('modalFields').innerHTML = '';
+}
+
+function updateRowCounts() {
+  const map = { users:'cnt-users', challenges:'cnt-challenges', daily_logs:'cnt-logs', badges:'cnt-badges', user_badges:'cnt-ubadges' };
+  Object.entries(map).forEach(([tbl, elId]) => {
+    const el = document.getElementById(elId);
+    if(el) el.textContent = DB[tbl].length;
+  });
+}
+
+// ─── CRUD FORMS ────────────────────────────────────────────
+const FORMS = {
+  users:       [{k:'username',l:'Kullanıcı Adı',t:'text'},{k:'email',l:'E-posta',t:'email'},{k:'password_hash',l:'Şifre Hash',t:'text'}],
+  challenges:  [{k:'user_id',l:'Kullanıcı ID',t:'number'},{k:'title',l:'Başlık',t:'text'},{k:'category',l:'Kategori',t:'text'},{k:'status',l:'Durum',t:'select',opts:['active','completed','failed']},{k:'start_date',l:'Başlangıç',t:'date'},{k:'end_date',l:'Bitiş',t:'date'}],
+  daily_logs:  [{k:'challenge_id',l:'Challenge ID',t:'number'},{k:'log_date',l:'Tarih',t:'date'},{k:'status',l:'Durum',t:'select',opts:['completed','missed','pending']},{k:'notes',l:'Not',t:'text'}],
+  badges:      [{k:'name',l:'Rozet Adı',t:'text'},{k:'description',l:'Açıklama',t:'text'},{k:'icon_url',l:'İkon URL',t:'text'}],
+  user_badges: [{k:'user_id',l:'Kullanıcı ID',t:'number'},{k:'badge_id',l:'Rozet ID',t:'number'}],
+};
+function renderInsertForm() {
+  const tbl=document.getElementById('insertTable').value;
+  document.getElementById('insertForm').innerHTML=FORMS[tbl].map(f=>`
+    <div class="field-group" style="margin-bottom:8px">
+      <label>${f.l}</label>
+      ${f.t==='select'?`<select id="if_${f.k}">${f.opts.map(o=>`<option>${o}</option>`).join('')}</select>`
+      :`<input type="${f.t}" id="if_${f.k}" placeholder="${f.l}">`}
+    </div>`).join('');
+}
+function renderUpdateForm() {
+  const tbl=document.getElementById('updateTable').value;
+  let html=`<div class="field-group" style="margin-bottom:8px"><label>ID</label><input type="number" id="uf_id" placeholder="Güncellenecek satırın ID'si"></div>`;
+  html+=FORMS[tbl].slice(0,3).map(f=>`
+    <div class="field-group" style="margin-bottom:8px">
+      <label>${f.l} (boş bırak = değişmesin)</label>
+      ${f.t==='select'?`<select id="uf_${f.k}"><option value="">—</option>${f.opts.map(o=>`<option>${o}</option>`).join('')}</select>`
+      :`<input type="${f.t}" id="uf_${f.k}" placeholder="${f.l}">`}
+    </div>`).join('');
+  document.getElementById('updateForm').innerHTML=html;
+}
+function renderDDL() {
+  const type=document.getElementById('ddlType').value;
+  const forms={
+    alter_add: `<div class="field-group" style="margin-bottom:8px"><label>Tablo</label><select id="ddl_tbl"><option>users</option><option>challenges</option><option>daily_logs</option></select></div>
+                <div class="field-group" style="margin-bottom:8px"><label>Yeni Sütun Adı</label><input id="ddl_col" type="text" placeholder="avatar_url"></div>
+                <div class="field-group"><label>Sütun Tipi</label><select id="ddl_coltype"><option>VARCHAR(255)</option><option>INT</option><option>TEXT</option><option>DATE</option><option>BOOLEAN</option></select></div>`,
+    alter_drop:`<div class="field-group" style="margin-bottom:8px"><label>Tablo</label><select id="ddl_tbl2"><option>users</option><option>challenges</option></select></div>
+                <div class="field-group"><label>Silinecek Sütun</label><input id="ddl_dropcol" type="text" placeholder="eski_sutun"></div>`,
+    create_index:`<div class="field-group" style="margin-bottom:8px"><label>İndeks Adı</label><input id="ddl_idxname" type="text" placeholder="idx_status"></div>
+                  <div class="field-group" style="margin-bottom:8px"><label>Tablo</label><select id="ddl_idxtbl"><option>challenges</option><option>daily_logs</option></select></div>
+                  <div class="field-group"><label>Sütun</label><input id="ddl_idxcol" type="text" placeholder="status"></div>`,
+    truncate:  `<div class="field-group"><label>Tablo</label><select id="ddl_trunctbl"><option>daily_logs</option><option>user_badges</option></select></div>`,
+  };
+  document.getElementById('ddlForm').innerHTML=forms[type]||'';
+}
+function doInsert() {
+  const tbl=document.getElementById('insertTable').value;
+  const vals=FORMS[tbl].map(f=>{ const el=document.getElementById('if_'+f.k); return el?el.value:''; });
+  const id=nextId[tbl]++;
+  DB[tbl].push({id,...Object.fromEntries(FORMS[tbl].map((f,i)=>[f.k,vals[i]||null]))});
+  document.getElementById('insertResult').innerHTML=`<span style="color:var(--green)">✅ Eklendi: ${tbl} id=${id}</span>`;
+  updateRowCounts();
+  if(currentTable===tbl) renderTableView();
+}
+function doUpdate() {
+  const tbl=document.getElementById('updateTable').value;
+  const id=parseInt(document.getElementById('uf_id')?.value);
+  if(!id) { document.getElementById('updateResult').innerHTML=`<span style="color:var(--red)">ID zorunlu!</span>`; return; }
+  const row=DB[tbl]?.find(r=>r.id===id);
+  if(!row) { document.getElementById('updateResult').innerHTML=`<span style="color:var(--red)">Satır bulunamadı: id=${id}</span>`; return; }
+  FORMS[tbl].slice(0,3).forEach(f=>{ const el=document.getElementById('uf_'+f.k); if(el&&el.value) row[f.k]=el.value; });
+  document.getElementById('updateResult').innerHTML=`<span style="color:var(--yellow)">✏️ Güncellendi: id=${id}</span>`;
+  updateRowCounts();
+  if(currentTable===tbl) renderTableView();
+}
+function doDelete() {
+  const tbl=document.getElementById('deleteTable').value;
+  const id=parseInt(document.getElementById('deleteId').value);
+  if(!id) { document.getElementById('deleteResult').innerHTML=`<span style="color:var(--red)">ID zorunlu!</span>`; return; }
+  const before=DB[tbl]?.length||0;
+  if(DB[tbl]) DB[tbl]=DB[tbl].filter(r=>r.id!==id);
+  const affected=before-(DB[tbl]?.length||0);
+  document.getElementById('deleteResult').innerHTML=affected
+    ?`<span style="color:var(--green)">🗑 Silindi: ${tbl} id=${id}</span>`
+    :`<span style="color:var(--red)">Satır bulunamadı: id=${id}</span>`;
+  updateRowCounts();
+  if(currentTable===tbl) renderTableView();
+}
+function doDDL() {
+  const type=document.getElementById('ddlType').value;
+  let msg='';
+  if(type==='alter_add') { const t=document.getElementById('ddl_tbl')?.value, c=document.getElementById('ddl_col')?.value, ct=document.getElementById('ddl_coltype')?.value; msg=`ALTER TABLE ${t} ADD COLUMN ${c} ${ct} – simüle edildi`; }
+  else if(type==='alter_drop') { const t=document.getElementById('ddl_tbl2')?.value, c=document.getElementById('ddl_dropcol')?.value; msg=`ALTER TABLE ${t} DROP COLUMN ${c} – simüle edildi`; }
+  else if(type==='create_index') { msg='CREATE INDEX – simüle edildi'; }
+  else if(type==='truncate') { const t=document.getElementById('ddl_trunctbl')?.value; if(DB[t]) DB[t]=[]; msg=`TRUNCATE TABLE ${t} – tüm satırlar temizlendi`; renderTableView(); }
+  document.getElementById('ddlResult').innerHTML=`<span style="color:var(--purple)">🏗 ${msg}</span>`;
+}
+
+// ─── CONNECTION CONFIG ─────────────────────────────────────
+function updateConnString() {
+  const type=document.getElementById('dbType')?.value, host=document.getElementById('dbHost')?.value||'localhost',
+        port=document.getElementById('dbPort')?.value||'3306', name=document.getElementById('dbName')?.value||'challenge_tracker',
+        user=document.getElementById('dbUser')?.value||'root', ch=document.getElementById('dbCharset')?.value||'utf8mb4';
+  const drivers={mysql:'mysql+pymysql', postgres:'postgresql+psycopg2', sqlite:'sqlite'};
+  const drv=drivers[type]||'mysql+pymysql';
+  const str=type==='sqlite'?`sqlite:///./challenge_tracker.db`:`${drv}://${user}:••••@${host}:${port}/${name}?charset=${ch}`;
+  const el=document.getElementById('connString');
+  if(el) el.textContent=str;
+}
+function toggleDbType() {
+  const t=document.getElementById('dbType')?.value;
+  const hide=t==='sqlite';
+  ['hostField','portField','userField','passField','sslField','charsetField'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display=hide?'none':'flex'; });
+  updateConnString();
+}
+['dbType','dbHost','dbPort','dbName','dbUser','dbCharset'].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('input',updateConnString); });
+
+function testConnection() {
+  const res=document.getElementById('connTestResult');
+  res.className='conn-test-result show'; res.textContent='⏳ Bağlantı test ediliyor...';
+  setTimeout(()=>{
+    connected=true;
+    document.getElementById('connStatus').classList.add('connected');
+    document.getElementById('connLabel').textContent=document.getElementById('dbName')?.value||'challenge_tracker';
+    res.className='conn-test-result show ok';
+    res.textContent='✅ Bağlantı başarılı! MySQL 8.0.36 – challenge_tracker (3 tablo, 5 index)';
+  },900);
+}
+function saveConfig() {
+  showToast('💾 Bağlantı ayarları kaydedildi','ok');
+  testConnection();
+}
+function loadPreset(p) {
+  const presets={
+    local:       {type:'mysql',host:'localhost',port:'3306',name:'challenge_tracker',user:'root'},
+    planetscale: {type:'mysql',host:'aws.connect.psdb.cloud',port:'3306',name:'challenge_tracker',user:'pscale_user'},
+    railway:     {type:'mysql',host:'containers-us-west-xxx.railway.app',port:'6543',name:'railway',user:'root'},
+  };
+  const pr=presets[p];
+  if(!pr) return;
+  document.getElementById('dbType').value=pr.type;
+  document.getElementById('dbHost').value=pr.host;
+  document.getElementById('dbPort').value=pr.port;
+  document.getElementById('dbName').value=pr.name;
+  document.getElementById('dbUser').value=pr.user;
+  updateConnString();
+  showToast(`📦 ${p} preset yüklendi`,'ok');
+}
+
+// ─── TOAST ─────────────────────────────────────────────────
+function showToast(msg,type) {
+  const d=document.createElement('div');
+  d.style.cssText=`position:fixed;bottom:20px;right:20px;background:${type==='ok'?'#1a3a1a':'#3a1a1a'};border:1px solid ${type==='ok'?'#238636':'#b91c1c'};color:${type==='ok'?'#3fb950':'#f85149'};padding:10px 16px;border-radius:8px;font-size:0.82rem;z-index:999;animation:fadeIn .2s`;
+  d.textContent=msg; document.body.appendChild(d);
+  setTimeout(()=>d.remove(),2500);
+}
+
+// ─── INIT ──────────────────────────────────────────────────
+renderInsertForm();
+renderUpdateForm();
+renderDDL();
+updateRowCounts();
+</script>
+</body>
+</html>

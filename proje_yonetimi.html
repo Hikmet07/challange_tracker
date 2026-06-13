@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proje Yönetim Yazılımı</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; color: #2d3748; }
+  header { background: #2b6cb0; color: white; padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 1.2rem; }
+  header span { font-size: 0.85rem; opacity: 0.8; }
+  nav { background: #2c5282; display: flex; gap: 2px; padding: 0 24px; flex-wrap: wrap; }
+  nav button { background: none; border: none; color: #bee3f8; padding: 10px 16px; cursor: pointer; font-size: 0.85rem; border-bottom: 3px solid transparent; transition: all 0.2s; }
+  nav button.active, nav button:hover { color: white; border-bottom-color: #63b3ed; background: rgba(255,255,255,0.1); }
+  .content { padding: 20px 24px; max-width: 1100px; margin: auto; }
+  .section { display: none; }
+  .section.active { display: block; }
+  .card { background: white; border-radius: 10px; padding: 18px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .card h2 { font-size: 1rem; color: #2b6cb0; margin-bottom: 12px; border-bottom: 2px solid #ebf8ff; padding-bottom: 8px; }
+  /* Dashboard */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .stat { background: white; border-radius: 10px; padding: 16px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.08); border-top: 4px solid #2b6cb0; }
+  .stat .val { font-size: 1.8rem; font-weight: 700; color: #2b6cb0; }
+  .stat .lbl { font-size: 0.75rem; color: #718096; margin-top: 4px; }
+  .progress-wrap { margin: 8px 0; }
+  .progress-label { display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 4px; }
+  .progress-bar { background: #e2e8f0; border-radius: 999px; height: 14px; overflow: hidden; }
+  .progress-bar .fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #3182ce, #63b3ed); transition: width 0.5s; }
+  .progress-bar .fill.red { background: linear-gradient(90deg, #e53e3e, #fc8181); }
+  .progress-bar .fill.green { background: linear-gradient(90deg, #38a169, #68d391); }
+  .big-progress { margin: 16px 0; }
+  .big-progress .fill { background: linear-gradient(90deg, #2b6cb0, #63b3ed); }
+  .pct-label { font-size: 2.5rem; font-weight: 700; color: #2b6cb0; text-align: center; }
+  .pct-sub { text-align: center; color: #718096; font-size: 0.85rem; }
+  /* Gantt */
+  .gantt-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  .gantt-table th { background: #ebf8ff; color: #2b6cb0; padding: 8px; text-align: left; border: 1px solid #bee3f8; }
+  .gantt-table td { padding: 6px 8px; border: 1px solid #e2e8f0; vertical-align: middle; }
+  .gantt-table tr:hover td { background: #f7fafc; }
+  .gantt-bar-cell { min-width: 280px; }
+  .bar-wrap { background: #e2e8f0; border-radius: 4px; height: 18px; position: relative; }
+  .bar { height: 100%; border-radius: 4px; position: absolute; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.65rem; font-weight: 600; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; }
+  .badge.green { background: #c6f6d5; color: #276749; }
+  .badge.blue { background: #bee3f8; color: #2c5282; }
+  .badge.yellow { background: #fefcbf; color: #744210; }
+  .badge.red { background: #fed7d7; color: #742a2a; }
+  /* Table */
+  table.simple { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  table.simple th { background: #2b6cb0; color: white; padding: 9px 10px; text-align: left; }
+  table.simple td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; }
+  table.simple tr:hover td { background: #ebf8ff; }
+  /* Kritik yol */
+  .flow { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin: 12px 0; }
+  .node { background: #2b6cb0; color: white; padding: 8px 14px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; }
+  .node.critical { background: #e53e3e; }
+  .node.slack { background: #718096; }
+  .arrow { color: #a0aec0; font-size: 1.2rem; }
+  .info-box { background: #ebf8ff; border-left: 4px solid #2b6cb0; border-radius: 4px; padding: 12px 14px; margin: 10px 0; font-size: 0.83rem; line-height: 1.6; }
+  .info-box.red { background: #fff5f5; border-color: #e53e3e; }
+  /* Bütçe */
+  .budget-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .bcard { border-radius: 10px; padding: 16px; text-align: center; }
+  .bcard.income { background: #c6f6d5; border: 2px solid #38a169; }
+  .bcard.expense { background: #fed7d7; border: 2px solid #e53e3e; }
+  .bcard.net { background: #ebf8ff; border: 2px solid #2b6cb0; }
+  .bcard .bval { font-size: 1.5rem; font-weight: 700; }
+  .bcard.income .bval { color: #276749; }
+  .bcard.expense .bval { color: #742a2a; }
+  .bcard.net .bval { color: #2b6cb0; }
+  .bcard .blbl { font-size: 0.75rem; color: #718096; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>📊 E-Ticaret Platformu Projesi</h1>
+    <span>Proje Yönetim Yazılımı &nbsp;|&nbsp; Başlangıç: 01 Nis 2025 &nbsp;|&nbsp; Bitiş: 30 Eyl 2025</span>
+  </div>
+</header>
+
+<nav>
+  <button class="active" onclick="show('dashboard',this)">🏠 Özet</button>
+  <button onclick="show('gantt',this)">📅 Gantt (Görev)</button>
+  <button onclick="show('gantt2',this)">👥 Gantt (Ekip)</button>
+  <button onclick="show('tasks',this)">📋 Görevler</button>
+  <button onclick="show('team',this)">👤 Ekip</button>
+  <button onclick="show('critical',this)">🔴 Kritik Yol</button>
+  <button onclick="show('budget',this)">💰 Bütçe</button>
+</nav>
+
+<div class="content">
+
+  <!-- DASHBOARD -->
+  <div id="dashboard" class="section active">
+    <div class="stats">
+      <div class="stat"><div class="val">18</div><div class="lbl">Toplam Görev</div></div>
+      <div class="stat"><div class="val">11</div><div class="lbl">Tamamlanan</div></div>
+      <div class="stat"><div class="val">5</div><div class="lbl">Devam Eden</div></div>
+      <div class="stat"><div class="val">2</div><div class="lbl">Bekleyen</div></div>
+      <div class="stat"><div class="val">4</div><div class="lbl">Ekip Üyesi</div></div>
+    </div>
+    <div class="card">
+      <h2>Proje Tamamlanma Oranı</h2>
+      <div class="pct-label">%61</div>
+      <div class="pct-sub">11 / 18 görev tamamlandı &nbsp;|&nbsp; 7 görev kaldı</div>
+      <div class="big-progress progress-wrap" style="margin-top:12px">
+        <div class="progress-bar"><div class="fill" style="width:61%"></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Sprint İlerlemesi</h2>
+      <div class="progress-wrap"><div class="progress-label"><span>Backend API</span><span>80%</span></div><div class="progress-bar"><div class="fill green" style="width:80%"></div></div></div>
+      <div class="progress-wrap"><div class="progress-label"><span>Frontend UI</span><span>65%</span></div><div class="progress-bar"><div class="fill" style="width:65%"></div></div></div>
+      <div class="progress-wrap"><div class="progress-label"><span>Veritabanı</span><span>90%</span></div><div class="progress-bar"><div class="fill green" style="width:90%"></div></div></div>
+      <div class="progress-wrap"><div class="progress-label"><span>Test & QA</span><span>30%</span></div><div class="progress-bar"><div class="fill red" style="width:30%"></div></div></div>
+    </div>
+  </div>
+
+  <!-- GANTT GÖREV -->
+  <div id="gantt" class="section">
+    <div class="card">
+      <h2>Gantt Şeması — Göreve Göre (6 Aylık)</h2>
+      <div style="overflow-x:auto">
+      <table class="gantt-table">
+        <thead>
+          <tr>
+            <th>Görev</th>
+            <th>Sorumlu</th>
+            <th>Durum</th>
+            <th class="gantt-bar-cell">Nis &nbsp;&nbsp;&nbsp;&nbsp; May &nbsp;&nbsp;&nbsp;&nbsp; Haz &nbsp;&nbsp;&nbsp;&nbsp; Tem &nbsp;&nbsp;&nbsp;&nbsp; Ağu &nbsp;&nbsp;&nbsp;&nbsp; Eyl</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- each bar: left% = start, width% = duration in 6-month scale -->
+          <tr><td>Analiz & Planlama</td><td>Ali</td><td><span class="badge green">✓ Bitti</span></td><td class="gantt-bar-cell"><div class="bar-wrap"><div class="bar" style="left:0%;width:16%;background:#38a169">Hf1-2</div></div></td></tr>
+          <tr><td>Veritabanı Tasarımı</td><td>Ayşe</td><td><span class="badge green">✓ Bitti</span></td><td class="gantt-bar-cell"><div class="bar-wrap"><div class="bar" style="left:14%;width:18%;background:#38a169">Hf3-4</div></div></td></tr>
+          <tr><td>Backend API</td><td>Mehmet</td><td><span class="badge blue">▶ Devam</span></td><td class="gantt-bar-cell"><div class="bar-wrap"><div class="bar" style="left:16%;width:34%;background:#2b6cb0">Hf3-8</div></div></td></tr>
+          <tr><td>Kullanıcı Arayüzü</td><td>Zeynep</td><td><span class="badge blue">▶ Devam</span></td><td class="gantt-bar-cell"><div class="bar-wrap"><div class="bar" style="left:33%;width:34%;background:#2b6cb0">Hf6-12</div></div></td></tr>
+          <tr><td>Ödeme Entegrasyonu</td><td>Mehmet</td><td><span class="badge yellow">⏳ Bekliyor</span></td><td class="gantt-bar-cell"><div class="bar-wrap"><div class="bar" style="left:50%;width:25%;background:#d69e2e">Hf9-13</div></div></td></tr>
+          <tr><td>Test & QA</td><td>Ali</td><td><span class="badge blue">▶ Devam</span></td><td class="gantt-bar-cell"><div class="bar-wrap"><div class="bar" style="left:67%;width:25%;background:#2b6cb0">Hf12-16</div></div></td></tr>
+          <tr><td>Deployment</td><td>Tüm Ekip</td><td><span class="badge yellow">⏳ Bekliyor</span></td><td class="gantt-bar-cell"><div class="bar-wrap"><div class="bar" style="left:84%;width:16%;background:#d69e2e">Hf17-18</div></div></td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- GANTT EKİP -->
+  <div id="gantt2" class="section">
+    <div class="card">
+      <h2>Gantt Şeması — Ekip Üyelerine Göre</h2>
+      <div style="overflow-x:auto">
+      <table class="gantt-table">
+        <thead>
+          <tr>
+            <th>Ekip Üyesi</th>
+            <th>Rol</th>
+            <th class="gantt-bar-cell">Nis &nbsp;&nbsp;&nbsp; May &nbsp;&nbsp;&nbsp; Haz &nbsp;&nbsp;&nbsp; Tem &nbsp;&nbsp;&nbsp; Ağu &nbsp;&nbsp;&nbsp; Eyl</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>👨‍💻 Ali</td><td>PM / Test</td><td class="gantt-bar-cell"><div class="bar-wrap"><div class="bar" style="left:0%;width:16%;background:#38a169">Planlama</div></div></td></tr>
+          <tr><td></td><td></td><td class="gantt-bar-cell"><div class="bar-wrap"><div class="bar" style="left:67%;width:25%;background:#2b6cb0">QA</div></div></td></tr>
+          <tr><td>👩‍💻 Ayşe</td><td>Veritabanı</td><td class="gantt-bar-cell"><div class="bar-wrap"><div class="bar" style="left:14%;width:18%;background:#38a169">DB Tasarım</div></div></td></tr>
+          <tr><td>👨‍🔧 Mehmet</td><td>Backend</td><td class="gantt-bar-cell"><div class="bar-wrap"><div class="bar" style="left:16%;width:34%;background:#2b6cb0">API</div></div></td></tr>
+          <tr><td></td><td></td><td class="gantt-bar-cell"><div class="bar-wrap"><div class="bar" style="left:50%;width:25%;background:#d69e2e">Ödeme</div></div></td></tr>
+          <tr><td>👩‍🎨 Zeynep</td><td>Frontend</td><td class="gantt-bar-cell"><div class="bar-wrap"><div class="bar" style="left:33%;width:51%;background:#805ad5">UI / UX</div></div></td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- GÖREVLER -->
+  <div id="tasks" class="section">
+    <div class="card">
+      <h2>Görev Raporu</h2>
+      <table class="simple">
+        <thead><tr><th>#</th><th>Görev</th><th>Sorumlu</th><th>Başlangıç</th><th>Bitiş</th><th>Öncelik</th><th>Durum</th><th>%</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Gereksinim Analizi</td><td>Ali</td><td>01 Nis</td><td>07 Nis</td><td><span class="badge red">Yüksek</span></td><td><span class="badge green">Tamamlandı</span></td><td>100%</td></tr>
+          <tr><td>2</td><td>Proje Planı</td><td>Ali</td><td>08 Nis</td><td>14 Nis</td><td><span class="badge red">Yüksek</span></td><td><span class="badge green">Tamamlandı</span></td><td>100%</td></tr>
+          <tr><td>3</td><td>Veritabanı Şeması</td><td>Ayşe</td><td>15 Nis</td><td>28 Nis</td><td><span class="badge red">Yüksek</span></td><td><span class="badge green">Tamamlandı</span></td><td>100%</td></tr>
+          <tr><td>4</td><td>REST API Geliştirme</td><td>Mehmet</td><td>15 Nis</td><td>30 Haz</td><td><span class="badge red">Yüksek</span></td><td><span class="badge blue">Devam Ediyor</span></td><td>80%</td></tr>
+          <tr><td>5</td><td>Kullanıcı Girişi UI</td><td>Zeynep</td><td>01 Haz</td><td>21 Haz</td><td><span class="badge yellow">Orta</span></td><td><span class="badge green">Tamamlandı</span></td><td>100%</td></tr>
+          <tr><td>6</td><td>Ürün Listeleme UI</td><td>Zeynep</td><td>22 Haz</td><td>13 Tem</td><td><span class="badge yellow">Orta</span></td><td><span class="badge blue">Devam Ediyor</span></td><td>60%</td></tr>
+          <tr><td>7</td><td>Ödeme Entegrasyonu</td><td>Mehmet</td><td>01 Tem</td><td>31 Ağu</td><td><span class="badge red">Yüksek</span></td><td><span class="badge yellow">Bekliyor</span></td><td>0%</td></tr>
+          <tr><td>8</td><td>Test Senaryoları</td><td>Ali</td><td>01 Ağu</td><td>31 Ağu</td><td><span class="badge yellow">Orta</span></td><td><span class="badge blue">Devam Ediyor</span></td><td>30%</td></tr>
+          <tr><td>9</td><td>Canlıya Alma</td><td>Tüm Ekip</td><td>01 Eyl</td><td>30 Eyl</td><td><span class="badge red">Kritik</span></td><td><span class="badge yellow">Bekliyor</span></td><td>0%</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- EKİP -->
+  <div id="team" class="section">
+    <div class="card">
+      <h2>Ekip Üyeleri Raporu</h2>
+      <table class="simple">
+        <thead><tr><th>Üye</th><th>Rol</th><th>Atanan Görev</th><th>Tamamlanan</th><th>İlerleme</th><th>Yük</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>👨‍💻 Ali Demir</td><td>Proje Müdürü / Test</td><td>5</td><td>4</td>
+            <td><div class="progress-bar" style="width:120px"><div class="fill" style="width:80%"></div></div></td>
+            <td><span class="badge green">Normal</span></td>
+          </tr>
+          <tr>
+            <td>👩‍💻 Ayşe Kaya</td><td>Veritabanı Uzmanı</td><td>3</td><td>3</td>
+            <td><div class="progress-bar" style="width:120px"><div class="fill green" style="width:100%"></div></div></td>
+            <td><span class="badge blue">Düşük</span></td>
+          </tr>
+          <tr>
+            <td>👨‍🔧 Mehmet Yıldız</td><td>Backend Geliştirici</td><td>5</td><td>2</td>
+            <td><div class="progress-bar" style="width:120px"><div class="fill red" style="width:40%"></div></div></td>
+            <td><span class="badge red">Yüksek</span></td>
+          </tr>
+          <tr>
+            <td>👩‍🎨 Zeynep Arslan</td><td>Frontend Geliştirici</td><td>5</td><td>2</td>
+            <td><div class="progress-bar" style="width:120px"><div class="fill" style="width:65%"></div></div></td>
+            <td><span class="badge yellow">Orta</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- KRİTİK YOL -->
+  <div id="critical" class="section">
+    <div class="card">
+      <h2>🔴 Kritik Yol (Critical Path)</h2>
+      <div class="info-box">
+        <strong>Kritik Yol Nedir?</strong><br>
+        Projenin en uzun görev zinciridir. Bu yoldaki herhangi bir görev gecikirseproje süresi uzar. Bolluk (Slack) süresi = 0 olan görevlerden oluşur.
+      </div>
+      <div class="info-box" style="background:#fff5f5;border-color:#e53e3e">
+        <strong>Bolluk Süresi (Slack/Float) Nedir?</strong><br>
+        Bir görevin, projenin toplam süresini etkilemeden ne kadar gecikebileceğini gösterir. Kritik yoldaki görevlerin bolluk süresi <strong>0 gün</strong>dür.
+      </div>
+      <p style="font-size:0.85rem;margin:12px 0 6px;font-weight:600">Bu Projenin Kritik Yolu:</p>
+      <div class="flow">
+        <div class="node critical">Analiz<br><small>7 gün</small></div>
+        <span class="arrow">→</span>
+        <div class="node critical">DB Tasarım<br><small>14 gün</small></div>
+        <span class="arrow">→</span>
+        <div class="node critical">Backend API<br><small>77 gün</small></div>
+        <span class="arrow">→</span>
+        <div class="node critical">Ödeme Ent.<br><small>61 gün</small></div>
+        <span class="arrow">→</span>
+        <div class="node critical">Test & QA<br><small>31 gün</small></div>
+        <span class="arrow">→</span>
+        <div class="node critical">Deployment<br><small>30 gün</small></div>
+      </div>
+      <p style="font-size:0.85rem;margin:14px 0 6px;font-weight:600">Kritik Yol Dışı (Bolluklu) Görevler:</p>
+      <div class="flow">
+        <div class="node slack">UI Tasarım<br><small>Bolluk: 14 gün</small></div>
+        <div class="node slack">Ürün Listeleme<br><small>Bolluk: 7 gün</small></div>
+      </div>
+      <table class="simple" style="margin-top:14px">
+        <thead><tr><th>Görev</th><th>Süre</th><th>Bolluk</th><th>Kritik mi?</th></tr></thead>
+        <tbody>
+          <tr><td>Analiz & Planlama</td><td>7 gün</td><td>0</td><td><span class="badge red">✓ Kritik</span></td></tr>
+          <tr><td>Veritabanı Tasarımı</td><td>14 gün</td><td>0</td><td><span class="badge red">✓ Kritik</span></td></tr>
+          <tr><td>Backend API</td><td>77 gün</td><td>0</td><td><span class="badge red">✓ Kritik</span></td></tr>
+          <tr><td>UI Tasarım</td><td>51 gün</td><td>14 gün</td><td><span class="badge green">Değil</span></td></tr>
+          <tr><td>Ödeme Entegrasyonu</td><td>61 gün</td><td>0</td><td><span class="badge red">✓ Kritik</span></td></tr>
+          <tr><td>Test & QA</td><td>31 gün</td><td>0</td><td><span class="badge red">✓ Kritik</span></td></tr>
+          <tr><td>Deployment</td><td>30 gün</td><td>0</td><td><span class="badge red">✓ Kritik</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- BÜTÇE -->
+  <div id="budget" class="section">
+    <div class="card">
+      <h2>Bütçe / Gelir / Gider Durumu</h2>
+      <div class="budget-grid">
+        <div class="bcard income"><div class="bval">₺180.000</div><div class="blbl">Toplam Gelir (Bütçe)</div></div>
+        <div class="bcard expense"><div class="bval">₺109.500</div><div class="blbl">Toplam Gider (Harcanan)</div></div>
+        <div class="bcard net"><div class="bval">₺70.500</div><div class="blbl">Net Kalan Bütçe</div></div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-label"><span>Bütçe Kullanımı</span><span>%61</span></div>
+        <div class="progress-bar"><div class="fill" style="width:61%"></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Gider Detayları</h2>
+      <table class="simple">
+        <thead><tr><th>Kalem</th><th>Planlanan</th><th>Harcanan</th><th>Kalan</th><th>Durum</th></tr></thead>
+        <tbody>
+          <tr><td>İşçilik (4 kişi)</td><td>₺120.000</td><td>₺75.000</td><td>₺45.000</td><td><span class="badge green">Normal</span></td></tr>
+          <tr><td>Sunucu / Hosting</td><td>₺20.000</td><td>₺12.000</td><td>₺8.000</td><td><span class="badge green">Normal</span></td></tr>
+          <tr><td>Yazılım Lisansları</td><td>₺15.000</td><td>₺15.000</td><td>₺0</td><td><span class="badge yellow">Tükendi</span></td></tr>
+          <tr><td>Test & QA</td><td>₺15.000</td><td>₺5.000</td><td>₺10.000</td><td><span class="badge blue">Devam</span></td></tr>
+          <tr><td>Beklenmedik Giderler</td><td>₺10.000</td><td>₺2.500</td><td>₺7.500</td><td><span class="badge green">İyi</span></td></tr>
+          <tr style="font-weight:700"><td>TOPLAM</td><td>₺180.000</td><td>₺109.500</td><td>₺70.500</td><td><span class="badge green">%61 Harcandı</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h2>Aylık Gider Trendi</h2>
+      <table class="simple">
+        <thead><tr><th>Ay</th><th>Gider</th><th>Kümülatif</th><th>%</th></tr></thead>
+        <tbody>
+          <tr><td>Nisan 2025</td><td>₺18.000</td><td>₺18.000</td><td>10%</td></tr>
+          <tr><td>Mayıs 2025</td><td>₺22.000</td><td>₺40.000</td><td>22%</td></tr>
+          <tr><td>Haziran 2025</td><td>₺25.000</td><td>₺65.000</td><td>36%</td></tr>
+          <tr><td>Temmuz 2025</td><td>₺27.500</td><td>₺92.500</td><td>51%</td></tr>
+          <tr><td>Ağustos 2025</td><td>₺17.000</td><td>₺109.500</td><td>61%</td></tr>
+          <tr style="color:#718096"><td>Eylül 2025 (Tahmin)</td><td>₺18.000</td><td>₺127.500</td><td>71%</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function show(id, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+</script>
+</body>
+</html>
